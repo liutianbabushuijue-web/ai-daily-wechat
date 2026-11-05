@@ -23,7 +23,7 @@ class BriefingTests(unittest.TestCase):
             with patch('sys.argv', ['briefing.py', '--output', output]), patch.object(b, 'get', return_value=b'{}'), contextlib.redirect_stdout(io.StringIO()) as log:
                 self.assertEqual(b.main(), 1)
             body = Path(output).read_text()
-            self.assertIn('AIHOT 日报', body)
+            self.assertIn('AI 与商业早报', body)
             self.assertNotIn('# AIHOT 日报', log.getvalue())
             self.assertNotIn('https://', log.getvalue())
     def test_workflow_has_no_public_content_export(self):
@@ -107,4 +107,5 @@ class BriefingTests(unittest.TestCase):
             with self.assertRaises(b.SafeError): b.send('body', NOW, 'SCTtestKey')
 
 if __name__ == '__main__': unittest.main()
+
 
