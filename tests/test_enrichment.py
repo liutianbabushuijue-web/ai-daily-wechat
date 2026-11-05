@@ -142,3 +142,28 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('模型配置未完成',body)
             self.assertNotIn('模型发布',log.getvalue())
             opener.assert_not_called()
+
+class DiagnosticTests(unittest.TestCase):
+    def test_http_status_without_sensitive_details(self):
+        import urllib.error
+        with patch.dict(os.environ,{'DASHSCOPE_API_KEY':'NOT_A_REAL_SECRET'},clear=True), patch('urllib.request.build_opener') as opener, contextlib.redirect_stdout(io.StringIO()) as log:
+            opener.return_value.open.side_effect=urllib.error.HTTPError('https://example.com/NOT_A_REAL_SECRET',401,'PRIVATE_NEWS_TEXT',{'secret':'NOT_A_REAL_SECRET'},None)
+            result,notice=e.enrich([SOURCE],True)
+            self.assertIsNone(result)
+            self.assertEqual(log.getvalue(),'QWEN_STATUS=HTTP_ERROR HTTP_STATUS=401\n')
+            self.assertNotIn('NOT_A_REAL_SECRET',notice)
+            self.assertNotIn('PRIVATE_NEWS_TEXT',notice)
+            self.assertEqual(opener.return_value.open.call_count,1)
+    def test_validation_failure_logs_category_only(self):
+        with patch.dict(os.environ,{'DASHSCOPE_API_KEY':'NOT_A_REAL_SECRET'},clear=True), patch('urllib.request.build_opener') as opener, contextlib.redirect_stdout(io.StringIO()) as log:
+            response=opener.return_value.open.return_value.__enter__.return_value
+            response.headers={};response.read.return_value=b'{"private":"PRIVATE_NEWS_TEXT"}'
+            e.enrich([SOURCE],True)
+            self.assertEqual(log.getvalue(),'QWEN_STATUS=OUTPUT_REJECTED REASON=RESPONSE_SCHEMA\n')
+
+    def test_unknown_validation_error_does_not_log_content(self):
+        with patch.dict(os.environ,{'DASHSCOPE_API_KEY':'NOT_A_REAL_SECRET'},clear=True), patch('urllib.request.build_opener') as opener, patch.object(e, 'validate', side_effect=ValueError('PRIVATE_NEWS_TEXT')), contextlib.redirect_stdout(io.StringIO()) as log:
+            response=opener.return_value.open.return_value.__enter__.return_value
+            response.headers={};response.read.return_value=json.dumps({'choices':[{'finish_reason':'stop','message':{'content':'{}'}}]}).encode()
+            e.enrich([SOURCE],True)
+            self.assertEqual(log.getvalue(),'QWEN_STATUS=OUTPUT_REJECTED REASON=VALIDATION\n')
