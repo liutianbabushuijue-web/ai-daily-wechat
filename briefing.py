@@ -125,7 +125,7 @@ def send(body, now, key):
     # Explicitly support Turbo SCT keys only. Never accept arbitrary URLs.
     if not re.fullmatch(r'SCT[A-Za-z0-9]+', key or ''):
         raise SafeError('请配置 Server酱 Turbo 的 SCT 格式 SendKey；不支持 sctp/旧 SCK 格式。')
-    data = urllib.parse.urlencode({'title': f'AI 与商业早报 {now.astimezone(CHINA):%m-%d}',
+    data = urllib.parse.urlencode({'title': f'每日简报 {now.astimezone(CHINA):%m-%d}',
                                   'desp': body}).encode('utf-8')
     request = urllib.request.Request('https://sctapi.ftqq.com/' + key + '.send', data=data,
                                     headers={'Content-Type': 'application/x-www-form-urlencoded'})
@@ -160,14 +160,7 @@ def main():
         print('AIHOT_STATUS=UNAVAILABLE')
         notices.append('AIHOT 暂时不可用或响应格式异常。')
     import enrichment
-    business = []
-    try:
-        business = enrichment.parse_business(get(enrichment.BUSINESS_RSS), now)
-        print('ECONOMICS_STATUS=READY' if business else 'ECONOMICS_STATUS=NO_RECENT_ITEMS')
-    except Exception:
-        print('ECONOMICS_STATUS=UNAVAILABLE')
-        notices.append('美联储 RSS 暂时不可用或格式异常；本期仅使用其他可用来源。')
-    sources = enrichment.select_sources(ai, business)
+    sources = enrichment.select_sources(ai)
     result, model_notice = enrichment.enrich(sources, enabled=args.qwen)
     if result is not None:
         print('QWEN_STATUS=READY')
