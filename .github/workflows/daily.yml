@@ -1,0 +1,55 @@
+name: Daily private briefing
+on:
+  push:
+    paths:
+      - 'briefing.py'
+      - 'tests/**'
+      - '.github/workflows/daily.yml'
+  schedule:
+    # UTC 00:15 = China 08:15. GitHub may start late; this is not an SLA.
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+    inputs:
+      send:
+        description: '发送到已绑定的微信渠道？false 仅检查，不展示正文'
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: private-daily-briefing
+  cancel-in-progress: false
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run offline tests
+        run: python -m unittest discover -s tests -v
+      - name: Check or send without public preview
+        if: github.event_name != 'push'
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          SHOULD_SEND: ${{ github.event_name == 'schedule' || inputs.send }}
+        run: |
+          if [ "$SHOULD_SEND" = "true" ] && [ -z "$SERVERCHAN_SENDKEY" ]; then
+            echo '尚未配置 SERVERCHAN_SENDKEY；跳过抓取与发送。'
+            exit 0
+          fi
+          if [ "$SHOULD_SEND" = "true" ]; then
+            python briefing.py --send --output "$RUNNER_TEMP/private-briefing.md"
+          else
+            python briefing.py --output "$RUNNER_TEMP/private-briefing.md"
+          fi
+      - name: Remove temporary private report
+        if: always()
+        run: rm -f "$RUNNER_TEMP/private-briefing.md"
