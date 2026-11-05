@@ -3,6 +3,7 @@ import json
 import os
 import re
 import urllib.request
+import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -124,11 +125,13 @@ def enrich(sources, enabled=False):
         return None, '模型未启用；使用来源摘录。'
     key = os.environ.get('DASHSCOPE_API_KEY', '').strip()
     if not key:
+        print('QWEN_STATUS=MISSING_KEY')
         return None, '模型配置未完成；请配置北京地域 DASHSCOPE_API_KEY。'
     payload = [{'id': s['id'], 'title': str(s['title'])[:180],
                 'summary': ''} for s in sources]
     source_json = json.dumps(payload, ensure_ascii=False)
     if len(source_json) > MAX_INPUT_CHARS:
+        print('QWEN_STATUS=INPUT_LIMIT')
         return None, '模型输入超过限制；使用来源摘录。'
     data = json.dumps({'model': MODEL, 'messages': [{'role': 'system', 'content': SYSTEM},
                        {'role': 'user', 'content': source_json}], 'temperature': 0.2,
@@ -144,9 +147,28 @@ def enrich(sources, enabled=False):
         if choice.get('finish_reason') != 'stop':
             raise ValueError('truncated')
         return validate(json.loads(choice['message']['content']), sources), None
+    except urllib.error.HTTPError as error:
+        # Never log the error body, URL, headers, request ID or exception string.
+        status = error.code if type(error.code) is int and 100 <= error.code <= 599 else 0
+        print(f'QWEN_STATUS=HTTP_ERROR HTTP_STATUS={status}')
+    except (TimeoutError, urllib.error.URLError):
+        print('QWEN_STATUS=NETWORK_ERROR')
+    except json.JSONDecodeError:
+        print('QWEN_STATUS=OUTPUT_REJECTED REASON=INVALID_JSON')
+    except ValueError as error:
+        # Only our finite internal validation labels may become diagnostic text.
+        reasons = {'schema': 'SCHEMA', 'count': 'ITEM_COUNT', 'news': 'NEWS_FIELDS',
+                   'id': 'SOURCE_ID', 'text': 'TEXT_FORMAT_OR_LENGTH',
+                   'evidence': 'EVIDENCE_MISMATCH', 'english': 'ENGLISH_FIELDS',
+                   'expression': 'EXPRESSION_FORMAT', 'grounding': 'EXPRESSION_MISMATCH',
+                   'truncated': 'INCOMPLETE_COMPLETION'}
+        reason = reasons.get(str(error), 'VALIDATION')
+        print(f'QWEN_STATUS=OUTPUT_REJECTED REASON={reason}')
+    except (KeyError, TypeError, IndexError):
+        print('QWEN_STATUS=OUTPUT_REJECTED REASON=RESPONSE_SCHEMA')
     except Exception:
-        # Includes 403/429/quota/timeouts, unsafe output and unsupported model parameters.
-        return None, '模型不可用或输出未通过检查；已降级为来源摘录，未重试。'
+        print('QWEN_STATUS=REQUEST_FAILED')
+    return None, '模型不可用或输出未通过检查；已降级为来源摘录，未重试。'
 
 
 def render(sources, result, notices, now):

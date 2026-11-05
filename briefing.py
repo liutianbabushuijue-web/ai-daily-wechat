@@ -150,20 +150,31 @@ def main():
     ai, notices = [], []
     try:
         ai = parse_ai(json.loads(get(AIHOT)), now)
+        print('AIHOT_STATUS=READY' if ai else 'AIHOT_STATUS=EMPTY')
         if not ai:
             notices.append('今日日报没有可解析且带来源链接的条目。')
     except SafeError as error:
+        print('AIHOT_STATUS=REJECTED')
         notices.append(str(error))
     except Exception:
+        print('AIHOT_STATUS=UNAVAILABLE')
         notices.append('AIHOT 暂时不可用或响应格式异常。')
     import enrichment
     business = []
     try:
         business = enrichment.parse_business(get(enrichment.BUSINESS_RSS), now)
+        print('ECONOMICS_STATUS=READY' if business else 'ECONOMICS_STATUS=NO_RECENT_ITEMS')
     except Exception:
+        print('ECONOMICS_STATUS=UNAVAILABLE')
         notices.append('美联储 RSS 暂时不可用或格式异常；本期仅使用其他可用来源。')
     sources = enrichment.select_sources(ai, business)
     result, model_notice = enrichment.enrich(sources, enabled=args.qwen)
+    if result is not None:
+        print('QWEN_STATUS=READY')
+    elif not args.qwen:
+        print('QWEN_STATUS=DISABLED')
+    elif not sources:
+        print('QWEN_STATUS=NO_SOURCES')
     if model_notice:
         notices.append(model_notice)
     body = enrichment.render(sources, result, notices, now)
