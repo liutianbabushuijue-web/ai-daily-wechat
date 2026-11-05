@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'briefing.py'
+      - 'enrichment.py'
       - 'tests/**'
       - '.github/workflows/daily.yml'
   schedule:
@@ -38,6 +39,8 @@ jobs:
       - name: Check or send without public preview
         if: github.event_name != 'push'
         env:
+          DASHSCOPE_API_KEY: ${{ secrets.apikey }}
+          QWEN_ENABLED: ${{ vars.QWEN_ENABLED }}
           SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
           SHOULD_SEND: ${{ github.event_name == 'schedule' || inputs.send }}
         run: |
@@ -45,11 +48,16 @@ jobs:
             echo '尚未配置 SERVERCHAN_SENDKEY；跳过抓取与发送。'
             exit 0
           fi
+          MODEL_FLAG=""
+          if [ "$QWEN_ENABLED" = "true" ]; then
+            MODEL_FLAG="--qwen"
+          fi
           if [ "$SHOULD_SEND" = "true" ]; then
-            python briefing.py --send --output "$RUNNER_TEMP/private-briefing.md"
+            python briefing.py $MODEL_FLAG --send --output "$RUNNER_TEMP/private-briefing.md"
           else
-            python briefing.py --output "$RUNNER_TEMP/private-briefing.md"
+            python briefing.py $MODEL_FLAG --output "$RUNNER_TEMP/private-briefing.md"
           fi
       - name: Remove temporary private report
         if: always()
         run: rm -f "$RUNNER_TEMP/private-briefing.md"
+

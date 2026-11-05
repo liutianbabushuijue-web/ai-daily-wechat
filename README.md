@@ -1,238 +1,105 @@
-<div align="center">
+# ☀️ AI 与商业早报 · 微信私密阅读
 
-# ☀️ AI 日报 · 每天送到微信
+AIHOT 当天日报 + 可选美联储近期公告 → 可选 Qwen 标题解读 → Server酱 Turbo → 已绑定微信渠道。
 
-**AIHOT 当天日报 → GitHub Actions → Server酱 Turbo → 你的微信**
+计划北京时间 **08:15** 运行。GitHub 可能延迟或漏跑，不保证准点。Python 3.12 标准库，无额外 Python 依赖。
 
-不用服务器 · 电脑无需开机 · 无大模型 API 费用 · Python 标准库
+## 手机速读内容
 
-[开始配置](#-五步开始使用) · [手动检查](#-检查与首次发送) · [常见问题](#-常见问题) · [安全说明](#-公开代码私密阅读)
+- 最多 **5 条**，优先 3 条 AIHOT + 2 条近 24 小时美联储理事会公告；公告不足用 AIHOT 补足，总数不足就少发。美联储是美国经济与政策来源，不代表全面商业新闻覆盖，也不保证每天有新公告。BBC RSS 不使用。
+- 每条短标题、90 字以内摘要、65 字以内“为什么重要（推断）”与“可以试试（建议）”。
+- 最多 **4 个英语表达**，必须逐字出现在本期来源标题中，并附中文释义和出处；不够就少给，不凑数。
+- 每条保留原文 URL；AIHOT 条目另保留 AIHOT 归属链接。
+- 模型关闭、额度耗尽、超时、响应截断或格式检查失败时，降级为短摘录，不生成解读或英语表达。
 
-</div>
+AIHOT 按北京时间当天报告日期校验。来源顺序是编辑来源顺序，不是模型重要性排名。没有抓取全文，模型解读仅基于标题，不发送来源摘要，无法替代阅读原文或事实核查。
 
----
+## 安全默认值
 
-## ✨ 这个项目做什么？
+**上传代码不会调用模型或推送。** `push` 只运行离线测试。模型默认关闭，仅存在密钥也不会启用。
 
-每天计划在 **北京时间 08:15** 获取 AIHOT 当天日报，按原顺序摘取最多 5 条，整理为一份适合手机速读的消息，通过 Server酱 Turbo 推送到你绑定的微信渠道。
+已配置 `SERVERCHAN_SENDKEY` 时，后续定时任务会继续推送；可用时加入美联储近 24 小时官方公告。没有该 Secret 的定时/发送任务会跳过抓取和发送。
 
-- **只看 AIHOT**：不混入商业 RSS 或英语角。
-- **带上出处**：最多 5 条标题（每条最多 60 字符）、每条最多 80 字符摘要摘录，以及原始来源和 AIHOT 归属链接。
-- **不冒充原创**：不另行调用大模型，不声称已独立核实报道。
-- **不拿旧闻补位**：只接受北京时间当天的日报；未更新或接口异常会明确提示。
-- **公开代码，私密阅读**：仓库公开，但不把日报正文发布到 README、提交、Actions 日志、Summary 或 artifacts。
+## 1. 配置自己的微信渠道
 
-> 条目按 AIHOT 原顺序选取，不是重要性排名，也不是大模型精选。摘要仅作长度截取，可能在句中结束；超长标题和摘要会显示省略号。
+在 [Server酱 Turbo](https://sct.ftqq.com/) 绑定自己的渠道并确认额度。在本仓库 **Settings → Secrets and variables → Actions → Secrets** 保存：
 
-> 这不是逐字完整转载。部分条目可能因缺少来源链接被跳过，超过数量上限的内容请到消息中的完整日报链接阅读。
+- `SERVERCHAN_SENDKEY`：Turbo 的 `SCT...` SendKey。
 
-## 📱 手机阅读版
+只支持 `SCT...`，不支持 `sctp...` 或旧版 `SCK...`。不要将任何完整密钥发到聊天、Issue、日志、代码或截图中。
 
-- 每条使用编号标题、短摘录、来源链接，段落之间留空行。
-- 不再重复显示栏目标题，说明放在末尾，完整内容通过链接阅读。
-- 微信或 Server酱页面的具体字号由接收端控制，本项目通过减少内容与改善结构降低阅读密度。
-- 当前仍只用 AIHOT，没有接入模型或其他新闻源。
+## 2. 可选：开启 Qwen
 
-## 🧭 工作原理
+本项目固定使用北京地域端点：
 
-```text
-GitHub 定时唤醒（计划北京时间 08:15）
-             ↓
-       离线安全与解析测试
-             ↓
-      AIHOT 官方公开接口
-             ↓
-     校验日期、摘编、保留出处
-             ↓
-    Server酱 Turbo → 绑定的微信渠道
-```
+- 模型：`qwen3.7-flash`
+- 接口：`https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`
 
-代码上传不会发消息：`push` 只运行离线测试。未配置 Secret 时，定时任务会安全跳过抓取和发送。**配置 Secret 后，后续定时任务就会自动发送**，因此请先确认自己的接收渠道。
+先在阿里云百炼控制台确认北京地域、模型可用性和账户计费状态。本项目按正常 API 用量使用，不依赖免费额度，也不要求“仅免费额度”开关。
 
-## 🚀 五步开始使用
+AIHOT 允许个人私密分析，但第三方模型处理的许可边界尚未完全确认。本版本将传输最小化为公开标题，不传摘要或全文；最小化不等于自动获得许可。请先确认你有权将这些标题交给百炼，并愿意按账户费率调用，再设置：
 
-### 1. 准备 Server酱 Turbo
+**Secrets：**
+- `apikey`：你的北京地域 API Key（沿用本仓库已确认的 Secret 名称）。工作流把它映射到程序的 `DASHSCOPE_API_KEY` 环境变量。
 
-打开 [Server酱 Turbo 官网](https://sct.ftqq.com/)，用你自己的账号登录。按照网站当前引导绑定接收渠道，确认它指向你自己的微信，并检查当前额度与渠道限制。
+**Variables：**
+- `QWEN_ENABLED`：`true`，表示明确开启模型调用。
 
-找到并复制 Turbo 的 **SendKey**：应以 `SCT` 开头。
+密钥仅通过官方安全界面配置，不发到聊天或代码里。没有启用变量，或者缺少密钥，不调用模型。代码不会充值、购买套餐或切换模型；已有账户的正常 API 调用可能产生费用。
 
-> 本项目只支持 Turbo 的 `SCT...`。不支持 Server酱³ 的 `sctp...` 或旧版 `SCK...`，不能靠修改前缀转换。不要在聊天、代码、Issue 或截图中提供完整 SendKey。
+每个运行最多一次模型请求，最多 5 条输入，每条仅标题最多 180 字符，输出最多 2200 tokens；不自动重试。此限制不是跨运行日/月额度，重复手动运行仍会产生用量。模型启用后，手动 `send=false` **也会调用模型并可能计费**，只是不向微信推送。关闭模型可把 `QWEN_ENABLED` 改为 `false`。
 
-### 2. 在 GitHub 创建 Secret
+费用示例：若当前标准价格为输入 ¥0.20/百万 tokens、输出 ¥0.80/百万 tokens，每次假设 5000 输入 + 2200 输出 tokens，每天一次、30 天约 **¥0.083**。这是模型费用示例，不是保证或账单上限，不含 GitHub/推送服务等费用；实际 tokens、价格和账户计费规则以服务商账单为准。需要硬预算时请自行在官方控制台检查是否提供相应限制，代码不宣称已经设置预算。
 
-打开本仓库：[ai-daily-wechat](https://github.com/liutianbabushuijue-web/ai-daily-wechat)。
+参考：[模型价格](https://help.aliyun.com/zh/model-studio/model-pricing)。额度不足、账户欠费、限流或调用失败时，降级为来源摘录，不自动切换模型。
 
-依次点击：
+## 3. 检查与发送
 
-**Settings → Secrets and variables → Actions → New repository secret**
+打开 **Actions → Daily private briefing → Run workflow**：
 
-| 输入项 | 填什么 |
-| --- | --- |
-| Name | `SERVERCHAN_SENDKEY` |
-| Secret | 你刚复制的完整 Turbo SendKey |
+1. 首次保持 `send=false`：获取来源，按是否启用调用模型，不推送、不公开正文。
+2. 确认自己的接收渠道后，选择 `send=true`：真实发送。
+3. 检查微信和 Server酱记录。日志中的“已接受”不等于微信已送达。
 
-点击 **Add secret**。注意是 **Secrets**，不是 **Variables**；不要把密钥粘进 README 或 Python 文件。
+发送超时可能已被服务端处理，因此没有 POST 重试。重复运行可能重复推送，先检查记录。来源缺失或模型已启用却降级，会保留可用内容并显示提示，同时任务标为失败，便于排查。模型按默认关闭不单独导致失败。
 
-便捷入口：[本仓库 Actions Secrets 设置](https://github.com/liutianbabushuijue-web/ai-daily-wechat/settings/secrets/actions)。只有具有对应权限的账号能管理它。
-
-### 3. 确认 Actions 可以运行
-
-打开仓库的 **Actions** 页，找到 **Daily private briefing**。如果 GitHub 提示工作流被禁用，按页面提示启用。新建或 fork 的仓库可能需要这一步。
-
-工作流必须存在于默认分支 `main`，定时触发才会生效。仓库设置如果禁止 Actions，也需由仓库所有者先调整。
-
-### 4. 做一次不发送检查
-
-按下一节的步骤手动运行，保持 `send` 为 **false**。它会测试代码、获取当天数据并检查格式，但**不会向微信发送，也不会在公开页面展示正文**。
-
-### 5. 自己确认一次真实发送
-
-确认接收渠道正确后，再手动运行一次，勾选 `send`（即 **true**）。这会真实推送。检查你的微信和 Server酱记录，确认成功后即可等待每天的定时任务。
-
-> 仓库发布不代表微信已验证。本项目不会替你填写密钥，也不会在你未选择发送时发送测试消息。
-
-## 🧪 检查与首次发送
-
-1. 打开 [Actions](https://github.com/liutianbabushuijue-web/ai-daily-wechat/actions)。
-2. 左侧选择 **Daily private briefing**。
-3. 右侧点击 **Run workflow**，分支选择 `main`。
-4. 首次保持 `send=false`，点击运行。
-5. 打开新出现的运行记录，查看步骤状态和条目数量。**没有正文预览是安全设计，不是错误。**
-6. 需要真实测试时重新运行并选择 `send=true`。
-
-| 运行方式 | 获取 AIHOT | 发送微信 |
-| --- | --- | --- |
-| 上传代码触发 `push` | 否 | 否 |
-| 手动 `send=false` | 是 | 否 |
-| 手动 `send=true`，有 Secret | 是 | 是 |
-| 每日定时，有 Secret | 是 | 是 |
-| 定时或手动发送，但无 Secret | 否 | 否，显示跳过 |
-
-**“Server酱已接受推送请求”不等于微信已经送达。** 最终要检查接收渠道和 Server酱记录。手动重复运行 `send=true` 会重复推送，没有跨运行去重。
-
-### 想看私密预览？在自己电脑上查看（可选）
-
-安装官方 Python 3.12 或更新版本，下载仓库并进入项目目录，执行：
+## 本地预览与离线测试
 
 ```sh
 python -m unittest discover -s tests -v
 python briefing.py
+# 明确启用，且环境变量已安全配置后才使用：
+python briefing.py --qwen
 ```
 
-然后用本机文本编辑器打开 `preview.md`。默认不发送，无需 SendKey。不要将此文件上传至 GitHub、Issue 或公开分享空间；`.gitignore` 已排除它，但不能阻止人为强制上传。
+默认预览写入 `preview.md`，只在自己电脑上查看，不要提交或公开。`--send` 才真实推送。离线测试不调用新闻、模型或推送服务，使用虚构示例。
 
-## ⏰ 修改时间、暂停和恢复
+## 隐私与可信边界
 
-定时配置位于 [`.github/workflows/daily.yml`](.github/workflows/daily.yml)：
+仓库公开，但正文只写入 runner 临时文件并在结束时清理，不写 README、提交、Actions 日志、Step Summary 或 artifacts。日志仅固定错误和条目数量，不打印异常对象、密钥或模型输出。不要开启 shell trace 或调试全文日志。
 
-```yaml
-- cron: '15 0 * * *'
-```
+正文与输入可能由 GitHub Actions、阿里云百炼（启用时）、Server酱和接收渠道处理，并非端到端加密。只向模型提供公开新闻标题，不要添加敏感个人信息。
 
-GitHub cron 使用 **UTC**，北京时间为 UTC+8。例如：
+来源被视作不可信数据：与系统指令分离，不提供工具、不按模型输出访问 URL。模型输出必须通过 JSON 字段、长度、来源 ID、精确证据片段与英语原文检查；链接只能由来源解析器插入。**这些检查不能证明每个生成句子事实正确，也不能完全消除提示注入。** 因此推断和建议始终标注，并保留可核对原文。模型不可用时返回摘录，不编写“备用事实”。
 
-| 北京时间 | UTC cron |
-| --- | --- |
-| 08:15 | `15 0 * * *` |
-| 08:30 | `30 0 * * *` |
-| 09:15 | `15 1 * * *` |
+固定模型/推送 HTTPS 主机，拒绝携带密钥的重定向；读取响应和解压大小受限；RSS 仅接受 UTF-8 编码并拒绝 DTD/实体；不执行来源内容。GitHub 权限仅 `contents: read`，检出不保存凭据。Actions 当前按官方大版本标签引用，未固定不可变提交 SHA。
 
-修改后保存到默认分支。过早运行可能碰到当天日报尚未出刊。
+## 维护
 
-- **暂停**：Actions → Daily private briefing → 右上角菜单 → **Disable workflow**。
-- **恢复**：回到工作流页面点击 **Enable workflow**。
-- **替换密钥**：Settings → Secrets and variables → Actions，编辑 `SERVERCHAN_SENDKEY`。
-- **停止发送但保留代码**：禁用工作流，或删除此 Secret。
+- 暂停：Actions → 工作流菜单 → Disable workflow。
+- 时间：`.github/workflows/daily.yml` 中 `15 0 * * *` 是北京时间 08:15。
+- GitHub 公开仓库长期无活动可能自动停用定时任务，需定期检查。
+- 凭据泄露：先在对应服务撤销/替换，再更新 GitHub Secret；删除文件不能清除历史泄露。
+- 发现报道错误时以原文和后续更正为准，不把模型推断作为投资或经营决策依据。
 
-## 🔒 公开代码，私密阅读
+文件：`briefing.py`（获取与推送），`enrichment.py`（RSS、模型与渲染），`tests/`（离线测试），`.github/workflows/daily.yml`（调度）。
 
-这个仓库是 **Public**：任何人都可能查看代码、提交历史和 Actions 日志。请不要把它当私人笔记本。
+保留来源不等于获得任意转载权。本项目仅个人私密阅读，不应未经许可公开、商业或批量再分发。RSS 可访问不代表内容可任意复制或交给第三方处理；部署前应核对各来源的当前使用许可，不能确认时停用相应来源。
 
-本项目的保护措施：
+来源：[AIHOT API](https://aihot.news/agent?tab=api) · [使用规则](https://aihot.news/terms) · [Server酱](https://sct.ftqq.com/)
 
-- Secret 仅注入检查/发送步骤，不出现在代码、正文、请求日志或异常堆栈中。
-- 正文临时写入 runner 的临时目录，运行结束时清理；不上传 artifacts、不写 Step Summary、不打印全文。
-- 日志只包含状态、数量和固定错误提示；测试数据为人工构造的示例，不包含实际日报。
-- 发送仅访问固定的 Server酱 Turbo HTTPS 主机，并拒绝推送重定向。
-- 工作流只有 `contents: read` 权限，检出后不保留 GitHub 凭据。
-- 不安装第三方 Python 包，只使用官方 checkout/setup-python Actions。它们当前按大版本标签引用，非不可变 SHA；更严格场景可审核后固定提交。
+## 美国经济来源范围
 
-**私密不等于端到端加密**：正文仍会由 GitHub Actions、Server酱和绑定接收渠道处理。不要加入敏感个人信息。具备仓库修改权限的人可能通过修改工作流接触 Secret，应限制协作者权限。
+使用 [美联储理事会官方 RSS](https://www.federalreserve.gov/feeds/press_all.xml)，只接受 `www.federalreserve.gov/newsevents/pressreleases/` 下符合官方公告路径的 HTTPS 链接，拒绝外部转载链接和带版权/第三方提示的条目，不抓取全文。遵循[官网版权说明](https://www.federalreserve.gov/disclaimer.htm)：通常属于公有领域，另有标注的材料除外。只取公开标题交给模型，并保留原文与时间。
 
-如果 SendKey 泄露，请先去 Server酱撤销或更换，再更新 GitHub Secret。仅删掉公开文件不等于已清除 Git 历史中的秘密。
-
-## 🛟 常见问题
-
-<details>
-<summary><b>08:15 为什么还没收到？</b></summary>
-
-GitHub 定时任务可能延迟，繁忙时也可能漏跑，不承诺精确到分钟。先看 Actions 是否有运行记录，再查其状态和 Server酱记录。AIHOT 是否及时出刊也影响内容；不要盲目重跑发送。
-
-公开仓库连续约 60 天没有仓库活动时，GitHub 可能自动禁用定时工作流。检查页面是否要求重新启用，不能把首次配置当作永久可靠服务。
-
-</details>
-
-<details>
-<summary><b>显示“尚未配置 SERVERCHAN_SENDKEY”怎么办？</b></summary>
-
-检查名称完全匹配、Secret 建在本仓库的 Actions Secrets 下，而不是 Variables。没有 Secret 会安全跳过，不代表微信已经成功配置。
-
-</details>
-
-<details>
-<summary><b>为什么运行是红色，但我收到了消息？</b></summary>
-
-AIHOT 接口异常、日期过旧或内容不可解析时，开启发送的运行会发送“内容暂缺”提示，并将任务标为失败，以便提醒你检查。不会拿旧日报冒充当天日报。你可以自行在 GitHub 通知设置中配置 Actions 失败通知。
-
-</details>
-
-<details>
-<summary><b>推送失败或超时，可以直接重跑吗？</b></summary>
-
-先检查微信和 Server酱记录。超时可能发生在服务端已接受请求之后，因此本项目不自动重试 POST。若确认未收到且额度允许，再自行决定是否重跑。并发排队不等于去重。
-
-</details>
-
-<details>
-<summary><b>免费吗？需要大模型 API Key 吗？</b></summary>
-
-不需要大模型 API Key，也没有本项目额外的大模型调用费用。GitHub Actions 和 Server酱的免费额度、计费、消息长度和接收渠道限制，以各自当前规则及账户页面为准，不保证永久免费，也不会自动购买付费服务。
-
-</details>
-
-<details>
-<summary><b>为什么 Summary 中看不到日报？</b></summary>
-
-因为这是公开仓库。正文只用于个人接收，不作为公开预览或附件。需要查看正文，请使用本地预览或你自己的微信渠道。
-
-</details>
-
-## 📁 文件说明
-
-```text
-.github/workflows/daily.yml   定时、手动检查、发送与离线测试
-briefing.py                  获取、校验、摘编和推送（标准库）
-tests/test_briefing.py        离线测试，不调用真实推送服务
-.gitignore                   排除本地预览、环境文件与缓存
-README.md                    本教程
-```
-
-## 📚 来源、使用范围与可靠性
-
-- 每次内容运行只进行一次 AIHOT GET，不自动重试，不绕过限流。
-- 摘要属于 **AIHOT 内容摘录**，不是本项目独立撰写或核实的报道。
-- 保留来源与归属不等于获得任意转载授权。本项目用于个人私密阅读，不应未经许可公开转载、收费、商业或批量再分发。
-- 公开本项目的代码不代表可以公开日报正文，也不代表本项目授予第三方内容许可。
-- 上游接口或规则变化可能需要更新解析器；请以官方最新说明为准。
-
-官方参考：[AIHOT API](https://aihot.news/agent?tab=api) · [OpenAPI](https://aihot.news/openapi-v1.json) · [使用规则](https://aihot.news/terms) · [Server酱文档](https://sct.ftqq.com/docs/integrations/csharp/) · [GitHub 定时任务说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
-
----
-
-<div align="center">
-
-**让代码每天醒一次，把阅读留给你。** ☕
-
-</div>
-
+此集成经过模拟测试，尚未验证实际 RSS 连通性；接口不可用时会说明并使用其他可用来源。近 24 小时没有公告是正常情况，不把旧公告当新消息。代码的来源限制不能取代逐项权利判断，发现额外限制时应停用相关材料。

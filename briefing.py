@@ -1,4 +1,4 @@
-"""Private, no-LLM news reader. Python 3.12+, standard library only."""
+"""Private news reader with optional bounded Qwen enrichment. Python 3.12+, standard library only."""
 import argparse
 import gzip
 import html
@@ -125,7 +125,7 @@ def send(body, now, key):
     # Explicitly support Turbo SCT keys only. Never accept arbitrary URLs.
     if not re.fullmatch(r'SCT[A-Za-z0-9]+', key or ''):
         raise SafeError('请配置 Server酱 Turbo 的 SCT 格式 SendKey；不支持 sctp/旧 SCK 格式。')
-    data = urllib.parse.urlencode({'title': f'AIHOT 日报 {now.astimezone(CHINA):%m-%d}',
+    data = urllib.parse.urlencode({'title': f'AI 与商业早报 {now.astimezone(CHINA):%m-%d}',
                                   'desp': body}).encode('utf-8')
     request = urllib.request.Request('https://sctapi.ftqq.com/' + key + '.send', data=data,
                                     headers={'Content-Type': 'application/x-www-form-urlencoded'})
@@ -144,6 +144,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--send', action='store_true', help='Actually send; default is a local preview.')
     parser.add_argument('--output', default='preview.md')
+    parser.add_argument('--qwen', action='store_true', help='Opt in to one Qwen request; requires the API key and may incur usage charges.')
     args = parser.parse_args()
     now = datetime.now(timezone.utc)
     ai, notices = [], []
@@ -155,12 +156,22 @@ def main():
         notices.append(str(error))
     except Exception:
         notices.append('AIHOT 暂时不可用或响应格式异常。')
-    body = render(ai, notices, now)
+    import enrichment
+    business = []
+    try:
+        business = enrichment.parse_business(get(enrichment.BUSINESS_RSS), now)
+    except Exception:
+        notices.append('美联储 RSS 暂时不可用或格式异常；本期仅使用其他可用来源。')
+    sources = enrichment.select_sources(ai, business)
+    result, model_notice = enrichment.enrich(sources, enabled=args.qwen)
+    if model_notice:
+        notices.append(model_notice)
+    body = enrichment.render(sources, result, notices, now)
     Path(args.output).write_text(body, encoding='utf-8')
-    print(f'AIHOT 日报已生成：{len(ai)} 条；来源提示 {len(notices)} 项。')
+    print(f'早报已生成：{len(sources)} 条；提示 {len(notices)} 项。')
     if args.send:
         send(body, now, os.environ.get('SERVERCHAN_SENDKEY', '').strip())
-    if notices:
+    if notices and any(n != '模型未启用；使用来源摘录。' for n in notices):
         print('内容不完整。请查看预览或收到的正文；本次标记失败以便 GitHub 提醒。')
         return 1
     return 0
@@ -175,4 +186,5 @@ if __name__ == '__main__':
         # Never expose a traceback/request object that might contain the SendKey.
         print('运行失败；详细异常已隐藏，防止泄露凭据。', file=sys.stderr)
         sys.exit(1)
+
 
