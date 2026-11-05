@@ -16,6 +16,9 @@ from zoneinfo import ZoneInfo
 AIHOT = 'https://aihot.news/api/v1/dailies/latest'
 CHINA = ZoneInfo('Asia/Shanghai')
 MAX_BYTES = 2_000_000
+MAX_ITEMS = 5
+TITLE_CHARS = 60
+EXCERPT_CHARS = 80
 
 class SafeError(Exception):
     """Only fixed, non-sensitive messages may cross the logging boundary."""
@@ -93,30 +96,28 @@ def parse_ai(payload, now):
             items.append({'title': raw['title'], 'summary': '', 'url': original,
                           'canonical': canonical, 'source': (raw.get('source') or {}).get('name', '原始来源'),
                           'category': '快讯'})
-    return items[:20]
+    return items[:MAX_ITEMS]
 
 
 def render(ai, notices, now):
     date = now.astimezone(CHINA).date().isoformat()
+    # Plain Markdown keeps the message readable across Server酱 channels.
+    # Ordering is AIHOT's, not a model-generated importance ranking.
+    selected = ai[:MAX_ITEMS]
     lines = [f'# AIHOT 日报 · {date}',
-        'AIHOT 内容摘编：保留标题、短摘要、原始来源和 AIHOT 归属链接。没有另行调用大模型，也未独立核验每条原始报道。',
-        f'生成时间：{now.astimezone(CHINA):%Y-%m-%d %H:%M}（北京时间）',
-        f'[阅读 AIHOT 完整日报](https://aihot.news/daily/{date})']
+        f'速读 {len(selected)} 条 · 按 AIHOT 原顺序摘录']
     for notice in notices:
         lines += [f'提示：{notice}']
-    category = None
-    for item in ai:
-        if item['category'] != category:
-            category = item['category']
-            lines += [f'## {plain(category, 60)}']
-        lines += [f'### {plain(item["title"])}']
+    for number, item in enumerate(selected, 1):
+        lines += [f'## {number}. {plain(item["title"], TITLE_CHARS)}']
         if item['summary']:
-            lines += [f'AIHOT 摘要摘录：{plain(item["summary"])}']
-        lines += [f'[原始来源：{plain(item["source"], 70)}]({item["url"]}) · [AIHOT 整理与归属]({item["canonical"]})']
-    if not ai:
+            lines += [plain(item["summary"], EXCERPT_CHARS)]
+        lines += [f'[原文 · {plain(item["source"], 24)}]({item["url"]}) · [AIHOT]({item["canonical"]})']
+    if not selected:
         lines += ['今日 AIHOT 内容暂缺，不用旧内容补位。']
-    lines += ['[数据来源：AIHOT](https://aihot.news/)',
-        '仅供个人私密阅读；不要未经许可公开转发或商业再分发。']
+    lines += [f'[阅读 AIHOT 完整日报](https://aihot.news/daily/{date})',
+        '以上为 AIHOT 摘录，最多 5 条；没有另行调用大模型，未独立核验报道。',
+        '仅供个人私密阅读，请勿未经许可转载。']
     return '\n\n'.join(lines)
 
 
@@ -174,3 +175,4 @@ if __name__ == '__main__':
         # Never expose a traceback/request object that might contain the SendKey.
         print('运行失败；详细异常已隐藏，防止泄露凭据。', file=sys.stderr)
         sys.exit(1)
+
