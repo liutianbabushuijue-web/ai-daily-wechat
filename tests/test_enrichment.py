@@ -10,7 +10,7 @@ import briefing as b
 import enrichment as e
 
 NOW = datetime(2026,11,5,0,15,tzinfo=timezone.utc)
-SOURCE = dict(id='S1', title='Markets rise as interest rates fall', summary='Business growth may slow.', url='https://example.com/news', canonical='', source='BBC Business')
+SOURCE = dict(id='S1', title='Markets rise as interest rates fall', summary='Business growth may slow.', url='https://example.com/news', canonical='', source='示例来源')
 RESULT = {'news': [dict(id='S1', evidence='interest rates', summary='来源报道市场上涨。', why='可能影响企业融资预期。', practice='列出值得核实的融资问题。')], 'english': [dict(id='S1', expression='interest rates', meaning='利率')]}
 
 class EnrichmentTests(unittest.TestCase):
@@ -70,37 +70,12 @@ class EnrichmentTests(unittest.TestCase):
             self.assertEqual(len(data['messages']),2)
             self.assertNotIn('Ignore system', data['messages'][1]['content'])
             self.assertEqual(json.loads(data['messages'][1]['content'])[0]['summary'], '')
-    def test_rss_freshness_and_entity_guard(self):
-        def rss(date):
-            return f'<rss><channel><item><title>Business news</title><link>https://www.federalreserve.gov/newsevents/pressreleases/monetary20261104a.htm</link><pubDate>{date}</pubDate></item></channel></rss>'.encode()
-        self.assertEqual(len(e.parse_business(rss('Wed, 04 Nov 2026 23:15:00 GMT'),NOW)),1)
-        self.assertEqual(e.parse_business(rss('Tue, 03 Nov 2026 23:15:00 GMT'),NOW),[])
-        self.assertEqual(e.parse_business(rss('Fri, 06 Nov 2026 23:15:00 GMT'),NOW),[])
-        with self.assertRaises(b.SafeError):e.parse_business(b'<!DOCTYPE x><rss/>',NOW)
-    def test_rss_rejects_external_links_and_rights_flags(self):
-        def rss(link, title='Official announcement'):
-            return f'<rss><channel><item><title>{title}</title><link>{link}</link><pubDate>Wed, 04 Nov 2026 23:15:00 GMT</pubDate></item></channel></rss>'.encode()
-        for url in ['https://www.federalreserve.gov:bad/newsevents/pressreleases/monetary20261104a.htm', 'https://[invalid', 'https://example.com/news', 'https://www.federalreserve.gov.evil.test/newsevents/pressreleases/monetary20261104a.htm', 'https://www.federalreserve.gov/aboutthefed.htm']:
-            self.assertEqual(e.parse_business(rss(url), NOW), [])
-        url='https://www.federalreserve.gov/newsevents/pressreleases/monetary20261104a.htm'
-        self.assertEqual(e.parse_business(rss(url,'Copyright third party'), NOW), [])
-    def test_rss_encoded_dtd_cannot_bypass_guard(self):
-        payload = '<?xml version="1.0"?><!DOCTYPE rss [<!ENTITY payload "expanded">]><rss><channel><item><title>&payload;</title></item></channel></rss>'
-        for encoding in ['utf-8', 'utf-8-sig', 'utf-16', 'utf-16-le', 'utf-16-be', 'utf-32', 'utf-32-le', 'utf-32-be']:
-            with self.subTest(encoding=encoding), self.assertRaises(b.SafeError):
-                e.parse_business(payload.encode(encoding), NOW)
-    def test_rss_unsupported_declared_encoding_rejected(self):
-        with self.assertRaises(b.SafeError):
-            e.parse_business(b'<?xml version="1.0" encoding="iso-8859-1"?><rss/>', NOW)
-    def test_rss_utf8_bom_supported(self):
-        self.assertEqual(e.parse_business('<rss><channel/></rss>'.encode('utf-8-sig'), NOW), [])
-    def test_source_mix_dedup_and_limit(self):
-        ai=[dict(SOURCE,url=f'https://example.com/ai/{i}') for i in range(5)]
-        biz=[dict(SOURCE,url=f'https://example.com/business/{i}') for i in range(5)]
-        selected=e.select_sources(ai,biz)
+    def test_source_order_dedup_and_limit(self):
+        ai=[dict(SOURCE,url=f'https://example.com/ai/{i}') for i in range(7)]
+        selected=e.select_sources(ai)
         self.assertEqual(len(selected),5)
-        self.assertEqual(sum('/business/' in s['url'] for s in selected),2)
-        self.assertEqual(len(e.select_sources([SOURCE]*5,[])),1)
+        self.assertEqual([s['url'] for s in selected],[s['url'] for s in ai[:5]])
+        self.assertEqual(len(e.select_sources([SOURCE]*5)),1)
     def test_render_preserves_links_and_labels_inference(self):
         text=e.render([SOURCE],RESULT,[],NOW)
         self.assertIn('(https://example.com/news)',text)
@@ -204,3 +179,21 @@ class OptionalEnglishTests(unittest.TestCase):
         r=copy.deepcopy(RESULT)
         r['english']=[dict(id='S1',expression=x,meaning='示例') for x in ['interest rates','market growth','trade policy','supply chain','consumer demand']]
         self.assertEqual(len(e.validate(r,[source])['english']),4)
+
+
+class SourceScopeTests(unittest.TestCase):
+    def test_only_aihot_is_requested_in_main(self):
+        import tempfile
+        from test_briefing import ai_payload
+        with tempfile.TemporaryDirectory() as tmp, patch('sys.argv',['briefing.py','--output',tmp+'/preview.md']), patch.object(b,'datetime') as dt, patch.object(b,'get',return_value=json.dumps(ai_payload()).encode()) as get, contextlib.redirect_stdout(io.StringIO()):
+            dt.now.return_value=NOW
+            self.assertEqual(b.main(),0)
+            get.assert_called_once_with(b.AIHOT)
+    def test_no_retired_source_in_runtime_or_readme(self):
+        from pathlib import Path
+        root=Path(__file__).parents[1]
+        for name in ['briefing.py','enrichment.py','README.md']:
+            text=(root/name).read_text()
+            self.assertNotIn('federalreserve.gov',text)
+            self.assertNotIn('美联储',text)
+        self.assertNotIn('商业早报',e.render([SOURCE],RESULT,[],NOW))
